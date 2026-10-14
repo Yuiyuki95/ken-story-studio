@@ -103,3 +103,22 @@ npm start
 - 凭证权限：https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api
 - 图片 API：https://developers.openai.com/api/reference/resources/images/methods/generate
 - ZIP 解压使用浏览器 Compression Standard：https://compression.spec.whatwg.org/
+
+
+## 角色资料生成（2.1）
+
+「角色资料库」→「AI 生成角色资料」：输入概念并选择 1–6 位，结合项目世界观与既有角色，生成姓名、身份、年龄、性别、性格、外观、背景、目标、能力、弱点、人际关系及立绘提示词。可逐栏修改、取消勾选，确认后存入角色库。同名只补空栏，锁定角色不会改变。新字段可同步、备份和导出 Markdown；旧项目仍可打开。
+
+自动生成使用现有文字 API，按服务商规则计费。没有 API 时，可复制提示词到 ChatGPT，粘贴返回的 JSON，再预览导入。此操作需要人工切换与粘贴，不是自动登录。
+
+## ChatGPT 账号登录的当前限制
+
+此 GitHub Pages 版本尚未实现 Sign in with ChatGPT。身份登录与授权使用 ChatGPT 套餐是不同权限。官方网页身份登录目前需要获批的 OAuth 客户端、登记的回调地址与后台；公开开源套餐授权要求本机 HTTP 回调监听。纯静态网页不能完成该本机流程。自托管 VM 的官方流程仍需先在本机授权，再安全转移凭证。
+
+此外，套餐授权预览目前不支持图片生成工具，不能替代此应用的人物立绘及动作图集图片 API。已配置的 API 仍独立计费，不能把 ChatGPT 套餐自动当成 API 余额。尚未完成真实账号登录或付费生成验证。
+
+官方依据（核对日期：2026-10-14）：
+- https://developers.openai.com/siwc/website
+- https://developers.openai.com/siwc/token-sharing-open-source/sign-in
+- https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms
+- https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations

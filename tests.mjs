@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {characterBriefPrompt,validateCharacterDrafts,aiCharacterBriefs,markdown,prompt} from './model.mjs';
 import {deflateRawSync} from 'node:zlib';
 import {workspace,character,outline,example,validateNodes,validateWorkspace,mergeCharacters,GitHubSync,ConflictError,hash,bytesToBase64,base64ToBytes,usedAssets,zip,unzip,crc32} from './model.mjs';
 
@@ -12,6 +13,25 @@ test('ZIP refuses traversal paths',async()=>{await assert.rejects(()=>zip([['../
 
 function fixture(){const files=new Map(),calls=[];let counter=0,privateRepo=true;return {files,calls,setPublic(){privateRepo=false;},async fetcher(url,options={}){calls.push({url,method:options.method,headers:options.headers});const u=new URL(url),path=decodeURIComponent(u.pathname.split('/contents/')[1]||'');if(!u.pathname.includes('/contents/'))return Response.json({private:privateRepo,default_branch:'main'});if(options.method==='PUT'){const body=JSON.parse(options.body),old=files.get(path);if(old?(body.sha!==old.sha):!!body.sha)return Response.json({message:'Conflict'},{status:409});const item={sha:'sha-'+(++counter),bytes:base64ToBytes(body.content)};files.set(path,item);return Response.json({content:{sha:item.sha}},{status:old?200:201});}const value=files.get(path);if(!value)return Response.json({message:'Missing'},{status:404});if(options.headers.Accept==='application/vnd.github.raw+json')return new Response(value.bytes);return Response.json({sha:value.sha,encoding:'base64',content:bytesToBase64(value.bytes)});}};}
 const makeClient=f=>new GitHubSync({owner:'fixture-user',repo:'private-data',token:'TEST_ONLY_NOT_A_SECRET',fetcher:f.fetcher.bind(f)});
+test('character draft boundaries reject malformed AI fields and discard untrusted paths',()=>{
+  const clean=validateCharacterDrafts({characters:[{name:'  Mira  ',age:'23',background:'Engineer',reference:'../../bad',locked:true,id:'forged'}]},1)[0];
+  assert.equal(clean.name,'Mira');assert.equal(clean.age,'23');assert(!('reference' in clean));assert(!('locked' in clean));assert(!('id' in clean));
+  for(const value of [{characters:[]},{characters:[{name:'A'},{name:'a'}]},{characters:[{name:'A',background:{bad:true}}]},{characters:[{name:'A',notes:'x'.repeat(6001)}]}])assert.throws(()=>validateCharacterDrafts(value));
+  assert.throws(()=>validateCharacterDrafts({characters:[{name:'A'}]},2));
+});
+test('new character fields persist, export and reach art prompts while legacy projects remain valid',()=>{
+  const w=workspace(),p=w.projects[0],legacy=character('Legacy');for(const key of ['age','gender','background','goal','abilities','weakness','portraitPrompt'])delete legacy[key];p.characters=[legacy];validateWorkspace(w);
+  mergeCharacters(p,[{name:'Mira',age:'23',background:'Orphaned engineer',goal:'Find mentor',abilities:'Repair birds',weakness:'Afraid of heights',portraitPrompt:'Silver coat'}]);
+  validateWorkspace(JSON.parse(JSON.stringify(w)));assert(markdown(p).includes('Orphaned engineer'));assert(prompt(p,p.characters[1],'portrait').includes('Silver coat'));
+  p.characters[1].locked=true;const original=structuredClone(p.characters[1]);mergeCharacters(p,[{name:'Mira',goal:'Overwrite',gender:'Other'}]);assert.deepEqual(p.characters[1],original);
+});
+test('character prompt includes canonical context without image assets or workspace history',()=>{
+  const p=example();p.history=[{details:'PRIVATE_HISTORY_MARKER'}];p.characters[0].reference='ASSET_PATH_MARKER';const text=characterBriefPrompt(p,'Mechanical bird keeper',2);assert(text.includes(p.world));assert(text.includes(p.characters[0].appearance));assert(text.includes('"locked":true'));assert(!text.includes('ASSET_PATH_MARKER'));assert(!text.includes('PRIVATE_HISTORY_MARKER'));assert.throws(()=>characterBriefPrompt(p,'',1));assert.throws(()=>characterBriefPrompt(p,'test',7));
+});
+test('character generator uses text API and rejects wrong-sized provider output',async()=>{
+  const original=globalThis.fetch;let requested;
+  try{globalThis.fetch=async(url,options)=>{requested={url,body:JSON.parse(options.body)};return Response.json({choices:[{message:{content:JSON.stringify({characters:[{name:'Mira',background:'Bird keeper'}]})}}]});};const cfg={textBase:'https://fixture.test/v1',textModel:'fixture-model',textKey:'FIXTURE_ONLY'};const result=await aiCharacterBriefs(cfg,example(),'Bird keeper',1);assert.equal(result[0].background,'Bird keeper');assert.equal(requested.url,'https://fixture.test/v1/chat/completions');assert.equal(requested.body.model,'fixture-model');await assert.rejects(()=>aiCharacterBriefs(cfg,example(),'Bird keeper',2));}finally{globalThis.fetch=original;}
+});
 const memoryStore=()=>{const assets=new Map();return {assets,async get(_store,key){return assets.get(key);},async put(_store,key,value){assets.set(key,value);}};};
 test('sync requires a private repo and validates credential target',async()=>{const f=fixture();f.setPublic();await assert.rejects(()=>makeClient(f).verify(),/私人/);assert.throws(()=>new GitHubSync({owner:'bad/owner',repo:'data',token:'x'}));});
 test('two devices share projects, characters and original image bytes',async()=>{const f=fixture(),a=makeClient(f),b=makeClient(f),local=memoryStore();await a.verify();await b.verify();const w=workspace(),blob=new Blob([new Uint8Array([1,2,3,4])],{type:'image/png'}),digest=await hash(blob),key='assets/'+digest+'.png';const ch=character('跨设备角色');ch.reference=key;ch.portraits=[key];w.projects[0].characters=[ch];w.assetMeta[key]={mime:'image/png',name:'test.png',size:blob.size};local.assets.set(key,blob);const sha=await a.push(w,null,local);const remote=await b.read();assert.equal(remote.sha,sha);assert.equal(remote.workspace.projects[0].characters[0].name,'跨设备角色');assert.deepEqual(new Uint8Array(await (await b.download(key)).arrayBuffer()),new Uint8Array(await blob.arrayBuffer()));assert.equal(f.files.size,2);assert(!JSON.stringify(remote.workspace).includes('TEST_ONLY_NOT_A_SECRET'));assert.equal(f.calls.filter(x=>x.method==='PUT').length,2);});
