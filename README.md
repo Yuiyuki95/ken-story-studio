@@ -16,7 +16,7 @@
 ## 发布网页：一次设置，之后直接打开网址
 
 1. 在 GitHub 新建专门的代码仓库。
-2. 把本文件夹的**内容**上传到仓库根目录，确保根目录能看到 `index.html`、`app.mjs`、`model.mjs`、`style.css` 和 `icon.svg`。不需要上传 Windows `.exe` 或 Python 版本。
+2. 把本文件夹的**内容**上传到仓库根目录，确保根目录能看到 `index.html`、`app.mjs`、`model.mjs`、`providers.mjs`、`style.css` 和 `icon.svg`。不需要上传 Windows `.exe` 或 Python 版本。
 3. 仓库 → Settings → Pages → Build and deployment → Source 选择 **Deploy from a branch**。
 4. 选择 `main` 分支，目录 `/ (root)`，按 Save。
 5. 等 GitHub Pages 完成发布，使用页面显示的 Visit site 网址。手机、平板和电脑打开同一个网址即可。网址通常是 `https://你的用户名.github.io/代码仓库名/`，实际以 Pages 显示的地址为准。
@@ -122,3 +122,24 @@ npm start
 - https://developers.openai.com/siwc/token-sharing-open-source/sign-in
 - https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms
 - https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations
+
+
+## Ollama 云端文字接入（2.2）
+
+1. 在 https://ollama.com/settings/keys 建立自己的 Ollama API 金钥。
+2. 工作台「连接与同步」→「AI 生成服务」→「剧情与角色」→ 文字服务选择 **Ollama 云端**。此步骤自动填入 `https://ollama.com/v1` 与 `gemma4:31b`，并清空上一服务的文字金钥。图片服务设置保持原样。
+3. 填入自己的 Ollama 金钥，按「测试文字连接」。只有完成请求且收到正确的 JSON 回应才显示成功；读取模型清单不代表已验证生成权限。改动网址、模型或金钥后需重新测试。
+4. 可按「读取模型清单」，再在模型名称栏选择或手动输入。模型列表不等于账号可用权限，也不等于免费模型名单；先确认 Ollama 账号的免费模型和剩余额度，不会自动切换到清单的第一个模型。
+5. 到故事工作台或角色资料库开始生成，核对草稿后再存入。
+
+不需要安装 Ollama，也不需要 ChatGPT API 金钥。金钥只留在当前网页记忆体，刷新、关闭或切换服务后需要重新填写。服务选择、网址和模型名称可保存在当前浏览器，金钥不进入偏好、项目、GitHub 同步或备份。
+
+此接入使用 OpenAI 兼容的 `/chat/completions` 与 `/models`。云端官方文档目前不支持强制结构化输出，因此没有发送 `response_format` 参数；工具依靠提示词要求 JSON 并严格校验，格式不正确时不写入项目，也不会自动重试消耗额度。Ollama 选项只接入文字，不会替代立绘和动作图集的图片服务。
+
+**真实云端连线仍需验证。** 此次环境无法解析 `ollama.com`，亦无用户金钥，因而未完成真实 Ollama 生成、账号权限或浏览器跨域验证。若「测试文字连接」失败，请先检查网络、金钥、模型和额度；若服务不允许网页直连，需使用自己部署并允许该工作台来源的 HTTPS 代理，再修改文字 API 基础网址。GitHub Pages 自身不会运行代理。
+
+官方资料（核对日期：2026-10-14）：
+- https://docs.ollama.com/cloud
+- https://docs.ollama.com/api/openai-compatibility
+- https://docs.ollama.com/capabilities/structured-outputs
+- https://ollama.com/pricing

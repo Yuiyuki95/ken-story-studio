@@ -1,1 +1,1 @@
-{"name":"ken-story-studio-web","version":"2.1.0","private":true,"type":"module","scripts":{"test":"node --test tests.mjs","start":"node serve.mjs"}}
+{"name":"ken-story-studio-web","version":"2.2.0","private":true,"type":"module","scripts":{"test":"node --test tests.mjs","start":"node serve.mjs"}}

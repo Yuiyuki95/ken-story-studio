@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {textPreset,textModels} from './providers.mjs';
 import {characterBriefPrompt,validateCharacterDrafts,aiCharacterBriefs,markdown,prompt} from './model.mjs';
 import {deflateRawSync} from 'node:zlib';
 import {workspace,character,outline,example,validateNodes,validateWorkspace,mergeCharacters,GitHubSync,ConflictError,hash,bytesToBase64,base64ToBytes,usedAssets,zip,unzip,crc32} from './model.mjs';
@@ -13,6 +14,14 @@ test('ZIP refuses traversal paths',async()=>{await assert.rejects(()=>zip([['../
 
 function fixture(){const files=new Map(),calls=[];let counter=0,privateRepo=true;return {files,calls,setPublic(){privateRepo=false;},async fetcher(url,options={}){calls.push({url,method:options.method,headers:options.headers});const u=new URL(url),path=decodeURIComponent(u.pathname.split('/contents/')[1]||'');if(!u.pathname.includes('/contents/'))return Response.json({private:privateRepo,default_branch:'main'});if(options.method==='PUT'){const body=JSON.parse(options.body),old=files.get(path);if(old?(body.sha!==old.sha):!!body.sha)return Response.json({message:'Conflict'},{status:409});const item={sha:'sha-'+(++counter),bytes:base64ToBytes(body.content)};files.set(path,item);return Response.json({content:{sha:item.sha}},{status:old?200:201});}const value=files.get(path);if(!value)return Response.json({message:'Missing'},{status:404});if(options.headers.Accept==='application/vnd.github.raw+json')return new Response(value.bytes);return Response.json({sha:value.sha,encoding:'base64',content:bytesToBase64(value.bytes)});}};}
 const makeClient=f=>new GitHubSync({owner:'fixture-user',repo:'private-data',token:'TEST_ONLY_NOT_A_SECRET',fetcher:f.fetcher.bind(f)});
+test('Ollama presets clear previous credentials and only change the text provider',()=>{
+  const config={textKey:'OLD_PROVIDER_KEY',imageKey:'IMAGE_KEY',imageBase:'https://image.test/v1',imageModel:'image-model'};Object.assign(config,textPreset('ollama-cloud'));
+  assert.equal(config.textBase,'https://ollama.com/v1');assert.equal(config.textModel,'gemma4:31b');assert.equal(config.textKey,'');assert.equal(config.imageKey,'IMAGE_KEY');assert.equal(config.imageBase,'https://image.test/v1');assert.throws(()=>textPreset('unknown'));
+});
+test('Ollama model discovery uses authenticated GET without a request body',async()=>{
+  const original=globalThis.fetch;
+  try{globalThis.fetch=async(url,options)=>{assert.equal(url,'https://ollama.com/v1/models');assert.equal(options.method,'GET');assert.equal(options.body,undefined);assert.equal(options.headers.Authorization,'Bearer FIXTURE_ONLY');assert.equal(options.headers['Content-Type'],undefined);return Response.json({data:[{id:'gemma4:31b'},{id:'gemma4:31b'},{id:'other-model'},{id:9}]});};assert.deepEqual(await textModels({...textPreset('ollama-cloud'),textKey:'FIXTURE_ONLY'}),['gemma4:31b','other-model']);globalThis.fetch=async()=>Response.json({data:[]});await assert.rejects(()=>textModels({textBase:'https://ollama.com/v1',textKey:'FIXTURE_ONLY'}));globalThis.fetch=async()=>Response.json({}, {status:401});await assert.rejects(()=>textModels({textBase:'https://ollama.com/v1',textKey:'FIXTURE_ONLY'}));}finally{globalThis.fetch=original;}
+});
 test('character draft boundaries reject malformed AI fields and discard untrusted paths',()=>{
   const clean=validateCharacterDrafts({characters:[{name:'  Mira  ',age:'23',background:'Engineer',reference:'../../bad',locked:true,id:'forged'}]},1)[0];
   assert.equal(clean.name,'Mira');assert.equal(clean.age,'23');assert(!('reference' in clean));assert(!('locked' in clean));assert(!('id' in clean));
