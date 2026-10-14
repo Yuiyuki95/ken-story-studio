@@ -1,0 +1,9 @@
+node_modules/
+qa/
+.env
+.env.*
+*.log
+*.kenstory
+*.kenstudio.json
+studio/
+assets/

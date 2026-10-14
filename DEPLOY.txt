@@ -1,0 +1,22 @@
+KEN Story Studio Web 2.0
+
+This is the browser version. No Windows or mobile installation is required.
+
+PUBLISH THE WEBSITE
+1. Create a dedicated GitHub code repository.
+2. Upload the CONTENTS of this folder to the repository root.
+3. Settings > Pages > Deploy from a branch > main > /(root) > Save.
+4. Open the URL shown by GitHub Pages from your phone or computer.
+
+CONNECT SHARED DATA
+1. Create a DIFFERENT PRIVATE repository with an initial README.
+2. Create a fine-grained token scoped only to that private data repository.
+3. Grant Contents: Read and write.
+4. In the app, open Connection and Sync and connect to that repository.
+5. Repeat on the other device, using the same private data repository.
+
+Your story data is not part of the public website code.
+Never put a real API key or GitHub token in this folder or any public repository.
+
+Read README.md for the complete Chinese guide and limitations.
+The ZIP is ready to upload; no GitHub deployment has been created for it yet.

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#13151d">
+  <meta name="description" content="KEN Story Studio：免安装的故事、角色、立绘与动作帧工作台。">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src https: http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <title>KEN Story Studio · Web</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <aside id="sidebar">
+    <a class="brand" href="#overview"><img src="./icon.svg" alt=""><span>KEN<span class="brand-sub">STORY STUDIO</span></span></a>
+    <div class="side-label">你的故事，从这里生长</div>
+    <nav id="nav" aria-label="工作区"></nav>
+    <div class="side-foot"><span class="tiny-dot"></span> WEB EDITION <span class="version">2.0</span><p>故事 · 角色 · 每一个动作</p></div>
+  </aside>
+  <div id="shell">
+    <header>
+      <div class="project-switch"><span class="overline">WORKSPACE / 创作空间</span><select id="project-select" aria-label="当前专案"></select></div>
+      <div class="header-actions"><span id="save-state" role="status">正在载入…</span><button class="cloud-pill" data-do="go-sync" id="sync-badge">未连接云端</button></div>
+    </header>
+    <main id="main" tabindex="-1"><div class="card loading">正在开启你的创作空间…</div></main>
+    <footer><span>KEN Story Studio</span><span>灵感留给创作，资料交给工作台。</span></footer>
+  </div>
+  <dialog id="dialog"><div id="dialog-content"></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./app.mjs"></script>
+</body>
+</html>
