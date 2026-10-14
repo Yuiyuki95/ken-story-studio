@@ -167,11 +167,18 @@ export class GitHubSync {
 
 export function parseJSON(text){try{return JSON.parse(text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,''));}catch{throw Error('AI 回传格式不是有效 JSON，原有资料已保留。');}}
 function aiURL(base,path){const u=new URL(base);if(u.username||u.password||u.search||u.hash||!(u.protocol==='https:'||(u.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(u.hostname))))throw Error('远端 AI 位址需为 HTTPS 基础网址。');return base.replace(/\/+$/,'')+'/'+path;}
+const knownRelayErrors=new Set(["不接受其他网站发起的请求。","此转接仅支持文字生成和模型清单。","请在工作台填写自己的 Ollama API 金钥。","请求需要 JSON 格式。","本次故事内容过大，请分段生成。","模型或文字消息格式不正确。","请求不是有效的 JSON。","Ollama 拒绝本次参数。","Ollama 金钥无效。","Ollama 可用额度不足。","当前账号没有此模型权限。","Ollama 找不到此模型或接口。","Ollama 额度不足或请求太频繁。","Ollama 暂时无法完成请求。","Ollama 模型清单格式不正确。","Ollama 没有返回完整文字。","Ollama 请求逾时或已取消。","后端暂时无法连接 Ollama，请稍后重试。"]);
+async function aiHTTPError(response){
+  let detail;
+  try {const body=await response.json();if(knownRelayErrors.has(body?.error))detail=body.error;}catch{}
+  const fallback=({400:'AI 服务拒绝参数，请检查模型、尺寸和透明选项。',401:'AI 金钥无效。',402:'AI 服务可用额度不足。',403:'没有使用此模型的权限，或转接服务拒绝此网页来源。',404:'找不到 AI 接口，请检查 API 基础网址和模型。',429:'AI 服务额度不足或请求太频繁。',502:'转接服务未取得有效的 AI 回应，请检查转接服务与 Ollama 的连接。',503:'AI 服务暂时不可用，请稍后重试。',504:'转接服务等待 AI 回应逾时，请稍后重试。'})[response.status]||'AI 服务请求失败。';
+  return new Error((detail||fallback)+`（HTTP ${response.status}）`);
+}
 export async function aiRequest(config,kind,path,body,form=false,method='POST') {
   if(typeof window!=='undefined'&&new URL(config[kind+'Base']).hostname==='ollama.com')throw Error('Ollama 云端不允许网页直连，请先部署转接服务，再选「自定义」并填写转接 API 基础网址。');
   const key=config[kind+'Key'];if(!key?.trim())throw Error('请先在连接与设置中填入本次使用的 AI 金钥。');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),method==='GET'?20000:240000);
-  try {const r=await fetch(aiURL(config[kind+'Base'],path),{method,headers:{Authorization:'Bearer '+key.trim(),...(method==='GET'||form?{}:{'Content-Type':'application/json'})},body:method==='GET'?undefined:form?body:JSON.stringify(body),signal:controller.signal,redirect:'error'});if(!r.ok)throw Error(({400:'AI 服务拒绝参数，请检查模型、尺寸和透明选项。',401:'AI 金钥无效。',403:'没有使用此模型的权限。',429:'AI 服务额度不足或请求太频繁。'})[r.status]||`AI 服务请求失败（${r.status}）。`);return await r.json();}catch(e){if(e.name==='AbortError')throw Error('AI 请求逾时；可在服务后台确认是否已计费。');if(e instanceof TypeError)throw Error('AI 连线失败。请检查网络与服务是否允许浏览器跨域请求；必要时使用你自己的代理服务。');throw e;}finally{clearTimeout(timer);}
+  try {const r=await fetch(aiURL(config[kind+'Base'],path),{method,headers:{Authorization:'Bearer '+key.trim(),...(method==='GET'||form?{}:{'Content-Type':'application/json'})},body:method==='GET'?undefined:form?body:JSON.stringify(body),signal:controller.signal,redirect:'error'});if(!r.ok)throw await aiHTTPError(r);try{return await r.json();}catch{throw Error('AI 服务未返回有效 JSON，请确认 Cloudflare 已部署完整的转接程式。');}}catch(e){if(e.name==='AbortError')throw Error('AI 请求逾时；可在服务后台确认是否已计费。');if(e instanceof TypeError)throw Error('AI 连线失败。请检查网络与服务是否允许浏览器跨域请求；必要时使用你自己的代理服务。');throw e;}finally{clearTimeout(timer);}
 }
 export async function aiText(config,prompt){const r=await aiRequest(config,'text','chat/completions',{model:config.textModel,messages:[{role:'system',content:'你是严谨的中文故事编辑。保留世界观与既定角色。不补未确认外观、年龄或身份。只返回要求的 JSON。'},{role:'user',content:prompt}]});const s=r.choices?.[0]?.message?.content;if(typeof s!=='string')throw Error('AI 未回传预期的文字。');return parseJSON(s);}
 export async function aiStory(config,p,instruction='',continuation=false) {
