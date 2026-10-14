@@ -124,22 +124,26 @@ npm start
 - https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations
 
 
-## Ollama 云端文字接入（2.2）
+## Ollama 云端文字接入（2.3 跨域修正）
 
-1. 在 https://ollama.com/settings/keys 建立自己的 Ollama API 金钥。
-2. 工作台「连接与同步」→「AI 生成服务」→「剧情与角色」→ 文字服务选择 **Ollama 云端**。此步骤自动填入 `https://ollama.com/v1` 与 `gemma4:31b`，并清空上一服务的文字金钥。图片服务设置保持原样。
-3. 填入自己的 Ollama 金钥，按「测试文字连接」。只有完成请求且收到正确的 JSON 回应才显示成功；读取模型清单不代表已验证生成权限。改动网址、模型或金钥后需重新测试。
-4. 可按「读取模型清单」，再在模型名称栏选择或手动输入。模型列表不等于账号可用权限，也不等于免费模型名单；先确认 Ollama 账号的免费模型和剩余额度，不会自动切换到清单的第一个模型。
-5. 到故事工作台或角色资料库开始生成，核对草稿后再存入。
+**Ollama Cloud 不能由 GitHub Pages 网页直接调用。** 已实际确认其跨域预检 OPTIONS 返回 405 且没有 Access-Control-Allow-Origin。原来只填写 `https://ollama.com/v1` 的直连步骤不完整，现已拦截并显示正确提示。金钥是否有效不能从这个跨域错误判断。
 
-不需要安装 Ollama，也不需要 ChatGPT API 金钥。金钥只留在当前网页记忆体，刷新、关闭或切换服务后需要重新填写。服务选择、网址和模型名称可保存在当前浏览器，金钥不进入偏好、项目、GitHub 同步或备份。
+无需在手机或电脑安装软件；先在自己的 Cloudflare 账号部署一个免费转接 Worker：
 
-此接入使用 OpenAI 兼容的 `/chat/completions` 与 `/models`。云端官方文档目前不支持强制结构化输出，因此没有发送 `response_format` 参数；工具依靠提示词要求 JSON 并严格校验，格式不正确时不写入项目，也不会自动重试消耗额度。Ollama 选项只接入文字，不会替代立绘和动作图集的图片服务。
+[部署 Ollama 转接服务](https://deploy.workers.cloudflare.com/?url=https://github.com/Yuiyuki95/ken-story-studio/tree/main/ollama-relay)
 
-**真实云端连线仍需验证。** 此次环境无法解析 `ollama.com`，亦无用户金钥，因而未完成真实 Ollama 生成、账号权限或浏览器跨域验证。若「测试文字连接」失败，请先检查网络、金钥、模型和额度；若服务不允许网页直连，需使用自己部署并允许该工作台来源的 HTTPS 代理，再修改文字 API 基础网址。GitHub Pages 自身不会运行代理。
+1. 打开上面的部署入口，登入或注册 Cloudflare，并依页面连接自己的 GitHub 账号。选择 Workers Free，部署本仓库独立的 `ollama-relay` 子目录。不需要把 Ollama 金钥交给 Cloudflare 设置。
+2. 部署成功后打开 Worker 根网址，复制页面显示的 `apiBase`，格式为 `https://你的-worker.workers.dev/v1`。
+3. 工作台「连接与同步」→ 文字服务选 **自定义 / OpenAI 兼容 API**，基础网址填上面的转接 `apiBase`，模型填 `gemma4:31b`，金钥填自己的 Ollama API 金钥。
+4. 按「测试文字连接」。成功后可生成剧情、对话、角色资料。免费模型和剩余额度以 Ollama 账号为准；图片服务另行设置。
 
-官方资料（核对日期：2026-10-14）：
+部署程序和检查说明见 [ollama-relay/README.md](ollama-relay/README.md)。转接固定使用 Ollama 官方接口，只允许本工作台的 GitHub 来源，不存储金钥、请求内容或启用应用日志，不是共享 AI 金钥。跨域来源限制不是用户身份认证，每次调用仍要提供自己的 Ollama 金钥。网页偏好、项目、同步和备份均不保存金钥。
+
+**当前完成状态：** 转接代码、模拟验证和网页修正已完成；尚未部署到你的 Cloudflare 账号，也未使用你的金钥做真实推理。曾尝试私人托管后端，但当前执行环境的 Git 托管连接失败，因此没有可用的私人版网址。不要把创建成功的空站点当成已部署服务。
+
+官方参考：
 - https://docs.ollama.com/cloud
 - https://docs.ollama.com/api/openai-compatibility
 - https://docs.ollama.com/capabilities/structured-outputs
-- https://ollama.com/pricing
+- https://developers.cloudflare.com/workers/platform/deploy-buttons/
+- https://developers.cloudflare.com/workers/platform/pricing/

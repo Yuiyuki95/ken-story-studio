@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ken-story-ollama",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-14",
+  "workers_dev": true,
+  "vars": { "ALLOWED_ORIGIN": "https://yuiyuki95.github.io" },
+  "observability": { "enabled": false }
+}

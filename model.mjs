@@ -1,4 +1,4 @@
-export const VERSION = '2.2.0';
+export const VERSION = '2.3.0';
 export const clone = value => structuredClone(value);
 export const id = () => crypto.randomUUID().replaceAll('-', '').slice(0, 12);
 export const now = () => new Date().toISOString();
@@ -168,6 +168,7 @@ export class GitHubSync {
 export function parseJSON(text){try{return JSON.parse(text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,''));}catch{throw Error('AI 回传格式不是有效 JSON，原有资料已保留。');}}
 function aiURL(base,path){const u=new URL(base);if(u.username||u.password||u.search||u.hash||!(u.protocol==='https:'||(u.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(u.hostname))))throw Error('远端 AI 位址需为 HTTPS 基础网址。');return base.replace(/\/+$/,'')+'/'+path;}
 export async function aiRequest(config,kind,path,body,form=false,method='POST') {
+  if(typeof window!=='undefined'&&new URL(config[kind+'Base']).hostname==='ollama.com')throw Error('Ollama 云端不允许网页直连，请先部署转接服务，再选「自定义」并填写转接 API 基础网址。');
   const key=config[kind+'Key'];if(!key?.trim())throw Error('请先在连接与设置中填入本次使用的 AI 金钥。');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),method==='GET'?20000:240000);
   try {const r=await fetch(aiURL(config[kind+'Base'],path),{method,headers:{Authorization:'Bearer '+key.trim(),...(method==='GET'||form?{}:{'Content-Type':'application/json'})},body:method==='GET'?undefined:form?body:JSON.stringify(body),signal:controller.signal,redirect:'error'});if(!r.ok)throw Error(({400:'AI 服务拒绝参数，请检查模型、尺寸和透明选项。',401:'AI 金钥无效。',403:'没有使用此模型的权限。',429:'AI 服务额度不足或请求太频繁。'})[r.status]||`AI 服务请求失败（${r.status}）。`);return await r.json();}catch(e){if(e.name==='AbortError')throw Error('AI 请求逾时；可在服务后台确认是否已计费。');if(e instanceof TypeError)throw Error('AI 连线失败。请检查网络与服务是否允许浏览器跨域请求；必要时使用你自己的代理服务。');throw e;}finally{clearTimeout(timer);}
