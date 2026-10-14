@@ -47,3 +47,20 @@ test('two devices share projects, characters and original image bytes',async()=>
 test('stale device cannot overwrite a newer cloud version',async()=>{const f=fixture(),a=makeClient(f),b=makeClient(f),store=memoryStore();await a.verify();await b.verify();const w=workspace(),sha=await a.push(w,null,store),phone=structuredClone(w),desktop=structuredClone(w);phone.projects[0].premise='手机版本';const next=await b.push(phone,sha,store);desktop.projects[0].premise='电脑版本';let conflict;try{await a.push(desktop,sha,store);}catch(e){conflict=e;}assert(conflict instanceof ConflictError);assert.equal(conflict.sha,next);assert.equal(conflict.remote.projects[0].premise,'手机版本');assert.equal((await a.read()).workspace.projects[0].premise,'手机版本');});
 test('a write race is reported as a conflict instead of retrying with force',async()=>{const f=fixture(),a=makeClient(f),store=memoryStore();await a.verify();const w=workspace(),sha=await a.push(w,null,store);const original=f.fetcher.bind(f);let race=true;f.fetcher=async(url,options)=>{if(race&&options.method==='PUT'&&url.includes('workspace.json')){race=false;const old=f.files.get('studio/workspace.json');f.files.set('studio/workspace.json',{...old,sha:'concurrent-sha'});}return original(url,options);};a.fetcher=f.fetcher;await assert.rejects(()=>a.push(w,sha,store),ConflictError);assert.equal(f.files.get('studio/workspace.json').sha,'concurrent-sha');});
 test('tampered remote assets fail the SHA-256 check',async()=>{const f=fixture(),a=makeClient(f);await a.verify();const key='assets/'+'a'.repeat(64)+'.png';f.files.set('studio/'+key,{sha:'bad',bytes:new Uint8Array([5])});await assert.rejects(()=>a.download(key),/校验/);});
+
+import {aiRequest} from './model.mjs';
+const config={textBase:'https://relay.test/v1',textKey:'FIXTURE_SECRET_ONLY'};
+async function withFetch(fetcher,run){const original=globalThis.fetch;try{globalThis.fetch=fetcher;await run();}finally{globalThis.fetch=original;}}
+test('connection errors show the sanitized relay reason and HTTP status',async()=>{
+ await withFetch(async()=>Response.json({error:'???????? Ollama,??????'},{status:502}),async()=>assert.rejects(()=>aiRequest(config,'text','models',undefined,false,'GET'),/???????? Ollama.*HTTP 502/));
+ await withFetch(async()=>Response.json({error:'Ollama ?????'},{status:401}),async()=>assert.rejects(()=>aiRequest(config,'text','models',undefined,false,'GET'),/Ollama ????.*HTTP 401/));
+});
+test('unrecognized provider errors and HTML bodies never expose reflected keys',async()=>{
+ for(const response of [Response.json({error:'FIXTURE_SECRET_ONLY'},{status:502}),new Response('FIXTURE_SECRET_ONLY',{status:502})])
+ await withFetch(async()=>response,async()=>assert.rejects(()=>aiRequest(config,'text','models',undefined,false,'GET'),e=>e.message.includes('HTTP 502')&&!e.message.includes(config.textKey)));
+});
+test('a Hello World response is reported as an incorrect relay deployment',async()=>{
+ await withFetch(async()=>new Response('Hello World!'),async()=>assert.rejects(()=>aiRequest(config,'text','models',undefined,false,'GET'),/????? JSON.*????/));
+});
+
+
