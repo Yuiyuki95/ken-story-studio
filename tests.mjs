@@ -52,15 +52,14 @@ import {aiRequest} from './model.mjs';
 const config={textBase:'https://relay.test/v1',textKey:'FIXTURE_SECRET_ONLY'};
 async function withFetch(fetcher,run){const original=globalThis.fetch;try{globalThis.fetch=fetcher;await run();}finally{globalThis.fetch=original;}}
 test('connection errors show the sanitized relay reason and HTTP status',async()=>{
- await withFetch(async()=>Response.json({error:'???????? Ollama,??????'},{status:502}),async()=>assert.rejects(()=>aiRequest(config,'text','models',undefined,false,'GET'),/???????? Ollama.*HTTP 502/));
- await withFetch(async()=>Response.json({error:'Ollama ?????'},{status:401}),async()=>assert.rejects(()=>aiRequest(config,'text','models',undefined,false,'GET'),/Ollama ????.*HTTP 401/));
+ await withFetch(async()=>Response.json({error:'后端暂时无法连接 Ollama，请稍后重试。'},{status:502}),async()=>assert.rejects(()=>aiRequest(config,'text','models',undefined,false,'GET'),/后端暂时无法连接 Ollama.*HTTP 502/));
+ await withFetch(async()=>Response.json({error:'Ollama 金钥无效。'},{status:401}),async()=>assert.rejects(()=>aiRequest(config,'text','models',undefined,false,'GET'),/Ollama 金钥无效.*HTTP 401/));
 });
 test('unrecognized provider errors and HTML bodies never expose reflected keys',async()=>{
  for(const response of [Response.json({error:'FIXTURE_SECRET_ONLY'},{status:502}),new Response('FIXTURE_SECRET_ONLY',{status:502})])
  await withFetch(async()=>response,async()=>assert.rejects(()=>aiRequest(config,'text','models',undefined,false,'GET'),e=>e.message.includes('HTTP 502')&&!e.message.includes(config.textKey)));
 });
 test('a Hello World response is reported as an incorrect relay deployment',async()=>{
- await withFetch(async()=>new Response('Hello World!'),async()=>assert.rejects(()=>aiRequest(config,'text','models',undefined,false,'GET'),/????? JSON.*????/));
+ await withFetch(async()=>new Response('Hello World!'),async()=>assert.rejects(()=>aiRequest(config,'text','models',undefined,false,'GET'),/未返回有效 JSON.*部署完整/));
 });
-
 
