@@ -2,7 +2,7 @@ import {aiRequest} from './model.mjs';
 
 export function ollamaRelayBase(){
   const path=globalThis.document?.querySelector('meta[name="ken-ollama-relay"]')?.content;
-  return path==='/api/ollama/v1'&&globalThis.location?new URL(path,globalThis.location.origin).href:'';
+  return path==='/api/ollama/v1'&&globalThis.location?new URL(path,globalThis.location.origin).href:'https://ken-story-ollama.lhnn1111.workers.dev/v1';
 }
 
 export const TEXT_PRESETS={
