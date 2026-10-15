@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {editAtlas,deleteAtlas} from './model.mjs';
 import assert from 'node:assert/strict';
 import {textPreset,textModels} from './providers.mjs';
 import {characterBriefPrompt,validateCharacterDrafts,aiCharacterBriefs,markdown,prompt} from './model.mjs';
@@ -62,4 +63,35 @@ test('unrecognized provider errors and HTML bodies never expose reflected keys',
 test('a Hello World response is reported as an incorrect relay deployment',async()=>{
  await withFetch(async()=>new Response('Hello World!'),async()=>assert.rejects(()=>aiRequest(config,'text','models',undefined,false,'GET'),/未返回有效 JSON.*部署完整/));
 });
+
+test('atlas edits and deletion sync without losing shared images or backup data',async()=>{
+  const api=fixture(),sync=makeClient(api);await sync.verify();
+  const w=workspace(),p=w.projects[0],image=new Blob(['fixture-image'],{type:'image/png'}),key='assets/'+await hash(image)+'.png';
+  w.assetMeta[key]={mime:'image/png',name:'shared.png',size:image.size};
+  p.assets=[{id:'first',path:key,action:'待机 Idle',cols:2,rows:2,count:4},{id:'second',path:key,action:'跑步 Run',cols:2,rows:2,count:4}];
+  const ch=character('共享图片角色');ch.reference=key;ch.portraits=[key];p.characters.push(ch);
+  const store={get:async()=>image};let sha=await sync.push(w,null,store);
+  editAtlas(p,'first',{name:'雪璃拔刀斩',action:'攻击 Attack',fps:18,loop:false,path:'untrusted.png'});
+  assert.equal(p.assets[0].path,key);validateWorkspace(w);
+  sha=await sync.push(w,sha,store);
+  const edited=await makeClient(api);await edited.verify();const loaded=await edited.read();
+  assert.equal(loaded.workspace.projects[0].assets[0].name,'雪璃拔刀斩');assert.equal(loaded.workspace.projects[0].assets[0].fps,18);assert.equal(loaded.workspace.projects[0].assets[0].loop,false);
+  const backup=cloneForAtlas(w);deleteAtlas(p,'first');validateWorkspace(w);
+  await sync.push(w,sha,store);const deleted=await edited.read();
+  assert.deepEqual(deleted.workspace.projects[0].assets.map(x=>x.id),['second']);
+  assert.equal(deleted.workspace.projects[0].characters[0].reference,key);assert(usedAssets(deleted.workspace).has(key));
+  assert.equal(await (await edited.download(key)).text(),await image.text());
+  const recovered=validateWorkspace(JSON.parse(JSON.stringify(backup)));
+  assert.equal(recovered.projects[0].assets[0].name,'雪璃拔刀斩');assert.equal(recovered.projects[0].assets[0].path,key);
+});
+function cloneForAtlas(value){return structuredClone(value);}
+test('legacy atlas records remain valid and malformed playback settings cannot corrupt a project',()=>{
+  const w=workspace(),p=w.projects[0],key='assets/'+'a'.repeat(64)+'.png';w.assetMeta[key]={mime:'image/png',name:'fixture',size:1};
+  p.assets=[{id:'legacy',path:key,cols:1,rows:1,count:1,action:'待机 Idle'}];validateWorkspace(w);
+  const before=structuredClone(p);
+  assert.throws(()=>editAtlas(p,'legacy',{name:'',action:'待机 Idle',fps:99,loop:true}));assert.deepEqual(p,before);
+  assert.throws(()=>deleteAtlas(p,'missing'));assert.deepEqual(p,before);
+  p.assets[0].fps=0;assert.throws(()=>validateWorkspace(w));
+});
+
 
