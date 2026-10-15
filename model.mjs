@@ -66,7 +66,20 @@ export function validateProject(p) {
   }
   validateNodes(p.nodes);
   for(const a of p.assets) if(!a||typeof a.id!=='string'||typeof a.path!=='string'||![a.cols,a.rows,a.count].every(Number.isInteger)||a.cols<1||a.rows<1||a.cols>32||a.rows>32||a.count<1||a.count>Math.min(a.cols*a.rows,256)) throw Error('动作图集资料无效。');
+  for(const a of p.assets) if((a.name!==undefined&&(typeof a.name!=='string'||a.name.length>120))||(a.fps!==undefined&&(!Number.isInteger(a.fps)||a.fps<1||a.fps>60))||(a.loop!==undefined&&typeof a.loop!=='boolean')) throw Error('图集名称或播放设置无效。');
   return p;
+}
+export function editAtlas(p,assetId,{name,action,fps,loop}){
+  const asset=p.assets.find(x=>x.id===assetId);
+  if(!asset)throw Error('这份图集已不存在，请重新选择。');
+  if(typeof name!=='string'||!name.trim()||name.trim().length>120||typeof action!=='string'||!action.trim()||action.length>120||!Number.isInteger(fps)||fps<1||fps>60||typeof loop!=='boolean')throw Error('请填写图集名称、动作类型及 1–60 的 FPS。');
+  Object.assign(asset,{name:name.trim(),action:action.trim(),fps,loop,modified:now()});
+  return asset;
+}
+export function deleteAtlas(p,assetId){
+  const index=p.assets.findIndex(x=>x.id===assetId);
+  if(index<0)throw Error('这份图集已不存在，请重新选择。');
+  return p.assets.splice(index,1)[0];
 }
 export function validateWorkspace(w) {
   if(!w||w.schema!=='ken-story-web-1'||!Array.isArray(w.projects)||w.projects.length>100||!w.assetMeta||typeof w.assetMeta!=='object'||Array.isArray(w.assetMeta)) throw Error('云端资料格式不受支持。');
@@ -223,3 +236,4 @@ export async function unzip(blob) {
   }
   return result;
 }
+
