@@ -6,9 +6,10 @@ import * as model from './model.mjs';
 
 class MemoryStore {
   data=new Map();
+  snapshots=[];
   async get(area,key){return structuredClone(this.data.get(area+':'+key));}
   async put(area,key,value){this.data.set(area+':'+key,structuredClone(value));}
-  async backup(){}
+  async backup(value){this.snapshots.push(structuredClone(value));}
 }
 const credentials={owner:'fixture-user',repo:'private-data',token:'FIXTURE_NOT_A_REAL_TOKEN'};
 test('remembered credentials survive reload as encrypted, device-only state',async()=>{
@@ -37,7 +38,7 @@ test('app reconnects on reload, keeps conflicts safe, resumes offline and forget
   const remote=model.workspace();remote.projects[0].title='Cloud fixture';let remoteSha='sha-initial';
   function dom(){const items=new Map();return {items,visibilityState:'visible',addEventListener(){},querySelectorAll(){return [];},querySelector(selector){if(selector.startsWith('meta['))return null;if(!items.has(selector))items.set(selector,{value:'',textContent:'',innerHTML:'',className:'',disabled:false,checked:false,open:false,setAttribute(){},classList:{remove(){}},showModal(){this.open=true;},close(){this.open=false;}});return items.get(selector);}};}
   async function load(){const document=dom();globalThis.document=document;
-    const source=base.replaceAll("from './providers.mjs'",`from '${new URL('./providers.mjs',import.meta.url).href}'`).replaceAll("from './model.mjs'",`from '${new URL('./model.mjs',import.meta.url).href}'`).replaceAll("from './device-connection.mjs'",`from '${new URL('./device-connection.mjs',import.meta.url).href}'`).replace(/\nstart\(\);\s*$/,"\nexport const started=start();\nexport {connect,disconnect,resumeConnection,changed,persist,record};\nexport const state=()=>({client:!!client,rememberDevice,conflict:!!conflict,dirty});");
+    const source=base.replaceAll("from './providers.mjs'",`from '${new URL('./providers.mjs',import.meta.url).href}'`).replaceAll("from './model.mjs'",`from '${new URL('./model.mjs',import.meta.url).href}'`).replaceAll("from './device-connection.mjs'",`from '${new URL('./device-connection.mjs',import.meta.url).href}'`).replace(/\nstart\(\);\s*$/,"\nexport const started=start();\nexport {connect,disconnect,resumeConnection,changed,persist,record};\nexport const state=()=>({client:!!client,rememberDevice,conflict:!!conflict,dirty});export {editSheetDialog,deleteSheetDialog};export const liveWorkspace=()=>w;export const dialogButtons=()=>dialogActions;export const stagePreview=(id)=>{sheetId=id;frames=[{}];originalFrames=[{}];};export const previewState=()=>({sheetId,frames:frames.length,originalFrames:originalFrames.length});");
     const app=await import('data:text/javascript;base64,'+Buffer.from(source+'\n//# sourceURL=app-fixture-'+serial+'.mjs\n').toString('base64')+'#'+serial++);await app.started;
     assert(!document.querySelector('#main').textContent.includes('无法开启创作空间'));
     return {app,document};
@@ -64,6 +65,18 @@ test('app reconnects on reload, keeps conflicts safe, resumes offline and forget
     await new DeviceConnection(store).save(credentials);globalThis.navigator.onLine=false;
     const offline=await load();assert.equal(offline.app.state().client,false);assert.equal(offline.app.state().rememberDevice,true);
     globalThis.navigator.onLine=true;await offline.app.resumeConnection(true);assert.equal(offline.app.state().client,true);
+    // Exercise the actual dialog callbacks and preview state without a browser renderer.
+    const atlas=await load();const live=atlas.app.liveWorkspace(),project=live.projects[0],path='assets/'+'a'.repeat(64)+'.png';
+    live.assetMeta[path]={mime:'image/png',name:'fixture.png',size:1};
+    project.assets=[{id:'selected',path,action:'待机 Idle',cols:1,rows:1,count:1},{id:'other',path,action:'待机 Idle',cols:1,rows:1,count:1}];
+    atlas.app.stagePreview('selected');atlas.app.editSheetDialog('selected');
+    atlas.document.querySelector('#sheet-name').value='Edited atlas';atlas.document.querySelector('#sheet-action').value='跑步 Run';atlas.document.querySelector('#sheet-fps').value='24';atlas.document.querySelector('#sheet-loop').checked=false;
+    let snapshots=store.snapshots.length;await atlas.app.dialogButtons()[1].fn();assert.equal(store.snapshots.length,snapshots+1);assert.equal(project.assets[0].name,'Edited atlas');assert.equal(project.assets[0].fps,24);
+    atlas.app.deleteSheetDialog('other');await atlas.app.dialogButtons()[0].fn();assert.equal(project.assets.length,2);
+    atlas.app.deleteSheetDialog('other');await atlas.app.dialogButtons()[1].fn();assert.equal(project.assets.length,1);assert.equal(atlas.app.previewState().sheetId,'selected');assert.equal(atlas.app.previewState().frames,1);
+    snapshots=store.snapshots.length;atlas.app.deleteSheetDialog('selected');await atlas.app.dialogButtons()[1].fn();assert.equal(store.snapshots.length,snapshots+1);assert.equal(store.snapshots.at(-1).projects[0].assets[0].id,'selected');
+    assert.deepEqual(atlas.app.previewState(),{sheetId:null,frames:0,originalFrames:0});assert.equal(project.assets.length,0);assert(live.assetMeta[path]);
     unauthorized=true;const expired=await load();assert.equal(expired.app.state().client,false);assert.equal(expired.app.state().rememberDevice,false);assert.equal(await new DeviceConnection(store).load(),null);
   }finally{model.Store.open=oldOpen;for(const [key,descriptor]of originals){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}}
 });
+
