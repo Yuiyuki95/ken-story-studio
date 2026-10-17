@@ -148,3 +148,14 @@ npm start
 - https://developers.cloudflare.com/workers/platform/deploy-buttons/
 - https://developers.cloudflare.com/workers/platform/pricing/
 
+
+## 在家本机、外出云端
+
+「连接与同步 → AI 生成服务 → 使用方式」新增自动、本机、云端三种模式。自动模式在每次文字生成前探测本机模型清单；能使用指定的本机模型时优先本机，连接失败或指定模型不存在时才改用云端。没有填写本机模型时选择首个不带 `cloud` 标签的模型。已发出的生成请求不会自动改送其他服务，避免重复请求。
+
+电脑本机基础网址为 `http://localhost:11434/v1`，不需要金钥。Windows 先退出托盘 Ollama，在 PowerShell 运行 `[Environment]::SetEnvironmentVariable('OLLAMA_ORIGINS','https://yuiyuki95.github.io','User')`，再从开始菜单打开 Ollama；浏览器如询问本地网络权限需允许。工作台内也提供复制命令的按钮。点击「读取本机模型」后选择已下载模型，并分别测试本机、云端。
+
+本机与云端的网址、模型分别保存；金钥只在当前网页会话内使用，不进入偏好、专案或同步。自动切换本身不保证云端凭证、权限或额度可用，需要有效的原有云端连接。立绘与动作图片沿用独立图片服务。
+
+手机上的 `localhost` 指手机，不能直接访问家中电脑；手机在家使用电脑推理需要另行配置能访问的 HTTPS 家用转接网址。可在「本机 API 基础网址」填入该服务的 OpenAI 兼容基础网址及独立家用转接金钥。当前更新不自动建立家用网络转接或安装模型。
+

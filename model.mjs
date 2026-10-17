@@ -1,3 +1,4 @@
+import {resolveTextConfig} from './text-routing.mjs';
 export const VERSION = '2.3.0';
 export const clone = value => structuredClone(value);
 export const id = () => crypto.randomUUID().replaceAll('-', '').slice(0, 12);
@@ -188,10 +189,11 @@ async function aiHTTPError(response){
   return new Error((detail||fallback)+`（HTTP ${response.status}）`);
 }
 export async function aiRequest(config,kind,path,body,form=false,method='POST') {
+  if(kind==='text'){config=await resolveTextConfig(config,{path});if(body&&config.resolvedTextSource==='local')body={...body,model:config.textModel};if(typeof window!=='undefined'&&typeof window.dispatchEvent==='function')window.dispatchEvent(new CustomEvent('ken-text-route',{detail:{source:config.resolvedTextSource,reason:config.routeReason,model:config.textModel}}));}
   if(typeof window!=='undefined'&&new URL(config[kind+'Base']).hostname==='ollama.com')throw Error('Ollama 云端不允许网页直连，请先部署转接服务，再选「自定义」并填写转接 API 基础网址。');
-  const key=config[kind+'Key'];if(!key?.trim())throw Error('请先在连接与设置中填入本次使用的 AI 金钥。');
+  const key=config[kind+'Key'];if(!(kind==='text'&&config.resolvedTextSource==='local')&&!key?.trim())throw Error('请先在连接与设置中填入本次使用的 AI 金钥。');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),method==='GET'?20000:240000);
-  try {const r=await fetch(aiURL(config[kind+'Base'],path),{method,headers:{Authorization:'Bearer '+key.trim(),...(method==='GET'||form?{}:{'Content-Type':'application/json'})},body:method==='GET'?undefined:form?body:JSON.stringify(body),signal:controller.signal,redirect:'error'});if(!r.ok)throw await aiHTTPError(r);try{return await r.json();}catch{throw Error('AI 服务未返回有效 JSON，请确认 Cloudflare 已部署完整的转接程式。');}}catch(e){if(e.name==='AbortError')throw Error('AI 请求逾时；可在服务后台确认是否已计费。');if(e instanceof TypeError)throw Error('AI 连线失败。请检查网络与服务是否允许浏览器跨域请求；必要时使用你自己的代理服务。');throw e;}finally{clearTimeout(timer);}
+  try {const r=await fetch(aiURL(config[kind+'Base'],path),{method,headers:{...(key?.trim()?{Authorization:'Bearer '+key.trim()}:{}),...(method==='GET'||form?{}:{'Content-Type':'application/json'})},body:method==='GET'?undefined:form?body:JSON.stringify(body),signal:controller.signal,redirect:'error'});if(!r.ok)throw await aiHTTPError(r);try{return await r.json();}catch{throw Error('AI 服务未返回有效 JSON，请确认 Cloudflare 已部署完整的转接程式。');}}catch(e){if(e.name==='AbortError')throw Error('AI 请求逾时；可在服务后台确认是否已计费。');if(e instanceof TypeError)throw Error('AI 连线失败。请检查网络与服务是否允许浏览器跨域请求；必要时使用你自己的代理服务。');throw e;}finally{clearTimeout(timer);}
 }
 export async function aiText(config,prompt){const r=await aiRequest(config,'text','chat/completions',{model:config.textModel,messages:[{role:'system',content:'你是严谨的中文故事编辑。保留世界观与既定角色。不补未确认外观、年龄或身份。只返回要求的 JSON。'},{role:'user',content:prompt}]});const s=r.choices?.[0]?.message?.content;if(typeof s!=='string')throw Error('AI 未回传预期的文字。');return parseJSON(s);}
 export async function aiStory(config,p,instruction='',continuation=false) {
@@ -236,4 +238,5 @@ export async function unzip(blob) {
   }
   return result;
 }
+
 

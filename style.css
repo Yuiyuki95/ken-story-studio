@@ -8,3 +8,6 @@
 .sheet-list > .button-row {width:100%;min-width:0;margin:0;align-items:stretch;}
 .sheet-list > .button-row > [data-do="load-sheet"] {flex:1 1 160px;min-width:0;white-space:normal;overflow-wrap:anywhere;text-align:left;}
 
+
+
+.setting-group details code {display:block;white-space:pre-wrap;overflow-wrap:anywhere;margin:10px 0;}

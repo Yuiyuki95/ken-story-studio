@@ -1,3 +1,4 @@
+import {isCloudModel} from './text-routing.mjs';
 import {aiRequest} from './model.mjs';
 
 export function ollamaRelayBase(){
@@ -20,7 +21,8 @@ export function textPreset(name){
 export async function textModels(config){
   const result=await aiRequest(config,'text','models',undefined,false,'GET');
   if(!Array.isArray(result?.data))throw Error('服务未返回兼容的模型清单，可手动填写模型名称。');
-  const models=[...new Set(result.data.filter(x=>typeof x?.id==='string'&&x.id.trim()&&x.id.length<=200).map(x=>x.id))];
+  const models=[...new Set(result.data.filter(x=>typeof x?.id==='string'&&x.id.trim()&&x.id.length<=200).map(x=>x.id))].filter(id=>config.textMode!=='local'||!isCloudModel(id));
   if(!models.length||models.length>1000)throw Error('模型清单为空或过大，请手动填写模型名称。');
   return models;
 }
+
